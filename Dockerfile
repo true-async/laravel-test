@@ -1,4 +1,4 @@
-# ===== NGINX Unit with TrueAsync PHP for Laravel (Linux x64 ZTS Release) =====
+# ===== FrankenPHP with TrueAsync PHP for Laravel (Linux x64 ZTS Release) =====
 # Multi-stage build: builder + runtime
 # Optimized for Laravel TrueAsync application
 
@@ -6,10 +6,11 @@
 FROM ubuntu:24.04 AS builder
 
 # Updated to use global-isolation branches
-ARG PHP_BRANCH=global-isolation
-ARG TRUEASYNC_BRANCH=global-isolation
-ARG NGINX_UNIT_BRANCH=true-async
+ARG PHP_BRANCH=true-async
+ARG TRUEASYNC_BRANCH=main
+ARG FRANKENPHP_BRANCH=true-async
 ARG XDEBUG_BRANCH=true-async-86
+ARG GO_VERSION=1.23.4
 
 # ---------- 1. System toolchain & libraries ----------
 RUN apt-get update && apt-get install -y \
@@ -25,7 +26,15 @@ RUN apt-get update && apt-get install -y \
     libtidy-dev libxslt1-dev libicu-dev libpsl-dev \
     libpcre2-dev
 
-# ---------- 2. libuv 1.49 ----------
+# ---------- 2. Install Go ----------
+RUN wget -q https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz \
+    && tar -C /usr/local -xzf go${GO_VERSION}.linux-amd64.tar.gz \
+    && rm go${GO_VERSION}.linux-amd64.tar.gz
+
+ENV PATH="/usr/local/go/bin:$PATH"
+ENV GOTOOLCHAIN=local
+
+# ---------- 3. libuv 1.49 ----------
 RUN wget -q https://github.com/libuv/libuv/archive/v1.49.0.tar.gz \
     && tar -xf v1.49.0.tar.gz \
     && cd libuv-1.49.0 && mkdir build && cd build \
@@ -33,7 +42,7 @@ RUN wget -q https://github.com/libuv/libuv/archive/v1.49.0.tar.gz \
     && ninja && ninja install && ldconfig \
     && cd / && rm -rf libuv*
 
-# ---------- 3. curl 8.10 ----------
+# ---------- 4. curl 8.10 ----------
 RUN wget -q https://github.com/curl/curl/releases/download/curl-8_10_1/curl-8.10.1.tar.gz \
     && tar -xf curl-8.10.1.tar.gz \
     && cd curl-8.10.1 \
@@ -41,27 +50,27 @@ RUN wget -q https://github.com/curl/curl/releases/download/curl-8_10_1/curl-8.10
     && make -j$(nproc) && make install && ldconfig \
     && cd / && rm -rf curl*
 
-# ---------- 4. Clone repositories ----------
+# ---------- 5. Clone repositories ----------
 # Clone PHP with TrueAsync patches (global-isolation branch)
 RUN git clone --depth=1 --branch=${PHP_BRANCH} https://github.com/true-async/php-src /usr/src/php-src
 
 # Clone TrueAsync extension (global-isolation branch)
 RUN git clone --depth=1 --branch=${TRUEASYNC_BRANCH} https://github.com/true-async/php-async /usr/src/php-async
 
-# Clone NGINX Unit with TrueAsync support
-RUN git clone --depth=1 --branch=${NGINX_UNIT_BRANCH} https://github.com/EdmondDantes/nginx-unit /usr/src/nginx-unit
+# Clone FrankenPHP with TrueAsync support
+RUN git clone --depth=1 --branch=${FRANKENPHP_BRANCH} https://github.com/true-async/frankenphp /usr/src/frankenphp
 
 # Clone XDEBUG with TrueAsync support
 RUN git clone --depth=1 --branch=${XDEBUG_BRANCH} https://github.com/true-async/xdebug /usr/src/xdebug
 
-# ---------- 5. Copy async extension into PHP source ----------
+# ---------- 6. Copy async extension into PHP source ----------
 RUN mkdir -p /usr/src/php-src/ext/async \
     && cp -r /usr/src/php-async/* /usr/src/php-src/ext/async/
 
-# ---------- 5.1. Fix Windows line endings ----------
+# ---------- 6.1. Fix Windows line endings ----------
 RUN dos2unix /usr/src/php-src/ext/async/config.m4 || true
 
-# ---------- 6. Configure & build PHP ----------
+# ---------- 7. Configure & build PHP ----------
 WORKDIR /usr/src/php-src
 
 RUN ./buildconf --force && \
@@ -90,7 +99,7 @@ RUN ./buildconf --force && \
 # Verify phpize is available
 RUN phpize --version && php-config --version
 
-# ---------- 7. Build XDEBUG extension ----------
+# ---------- 8. Build XDEBUG extension ----------
 WORKDIR /usr/src/xdebug
 
 RUN phpize && \
@@ -98,7 +107,7 @@ RUN phpize && \
     make -j$(nproc) && \
     make install
 
-# ---------- 8. PHP configuration ----------
+# ---------- 9. PHP configuration ----------
 RUN mkdir -p /etc/php.d && echo "opcache.enable_cli=1" > /etc/php.d/opcache.ini
 
 # Configure XDEBUG
@@ -110,17 +119,32 @@ RUN echo "zend_extension=xdebug.so" > /etc/php.d/xdebug.ini && \
     echo "xdebug.log=/app/www/storage/logs/xdebug.log" >> /etc/php.d/xdebug.ini && \
     echo "xdebug.log_level=7" >> /etc/php.d/xdebug.ini
 
-# ---------- 9. Build NGINX Unit ----------
-WORKDIR /usr/src/nginx-unit
+# ---------- 10. Install e-dant/watcher (for file watching in FrankenPHP) ----------
+WORKDIR /usr/local/src/watcher
+RUN curl -s https://api.github.com/repos/e-dant/watcher/releases/latest | \
+    grep tarball_url | \
+    awk '{ print $2 }' | \
+    sed 's/,$//' | \
+    sed 's/"//g' | \
+    xargs curl -L | \
+    tar xz --strip-components 1 && \
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build build && \
+    cmake --install build && \
+    ldconfig
 
-# Configure and build Unit core
-RUN ./configure && make -j$(nproc) && make install
+# ---------- 11. Build FrankenPHP ----------
+WORKDIR /usr/src/frankenphp
 
-# ---------- 10. Build PHP module for NGINX Unit ----------
-RUN ./configure php && make php && make php-install
+# Set up CGO flags for PHP embedding
+ENV CGO_CFLAGS="$(php-config --includes)"
+ENV CGO_LDFLAGS="$(php-config --ldflags) $(php-config --libs)"
 
-# ---------- 11. Verify module was installed ----------
-RUN ls -la /usr/local/lib/unit/modules/
+# Build FrankenPHP with TrueAsync support
+RUN cd caddy/frankenphp && \
+    go build -tags "trueasync,nowatcher" -o frankenphp && \
+    cp frankenphp /usr/local/bin/frankenphp && \
+    chmod +x /usr/local/bin/frankenphp
 
 # ---------- RUNTIME STAGE ----------
 FROM ubuntu:24.04 AS runtime
@@ -135,13 +159,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libmysqlclient21 libbz2-1.0 libenchant-2-2 \
     libffi8 libgdbm6 liblmdb0 libsnmp40 \
     libtidy5deb1 libxslt1.1 libicu74 libpsl5 \
-    libpcre2-8-0 \
+    libpcre2-8-0 libstdc++6 \
     ca-certificates curl \
     mysql-server-8.0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Create unit user and group with fixed UID/GID
-RUN groupadd -r -g 999 unit && useradd -r -g unit -u 999 unit
+# Create frankenphp user and group with fixed UID/GID
+RUN groupadd -r -g 999 frankenphp && useradd -r -g frankenphp -u 999 frankenphp
 
 # Create mysql directories and set permissions
 RUN mkdir -p /var/run/mysqld /var/lib/mysql /var/log/mysql \
@@ -152,24 +176,22 @@ RUN mkdir -p /var/run/mysqld /var/lib/mysql /var/log/mysql \
 COPY --from=builder /usr/local /usr/local
 COPY --from=builder /etc/php.d /etc/php.d
 
+# Copy watcher library
+COPY --from=builder /usr/local/lib/libwatcher* /usr/local/lib/
+
 # Create runtime directories with proper permissions
-RUN mkdir -p /usr/local/var/run/unit /usr/local/var/lib/unit /usr/local/var/log/unit \
-    /app/www \
-    && chown -R unit:unit /usr/local/var/run/unit /usr/local/var/lib/unit /usr/local/var/log/unit /app
+RUN mkdir -p /app/www /config/caddy /data/caddy /etc/caddy \
+    && chown -R frankenphp:frankenphp /app /config /data
 
 # Update library cache
 RUN ldconfig
 
 # Set PATH
 ENV PATH="/usr/local/bin:/usr/local/sbin:$PATH"
+ENV GODEBUG=cgocheck=0
 
 # Verify installations
-RUN php -v && unitd --version
-
-# Verify PHP module exists
-RUN ls -la /usr/local/lib/unit/modules/ && \
-    test -f /usr/local/lib/unit/modules/php.unit.so || \
-    (echo "ERROR: PHP module not found!" && exit 1)
+RUN php -v && frankenphp version
 
 WORKDIR /app
 
@@ -179,8 +201,8 @@ ENV MYSQL_ROOT_PASSWORD=root \
     MYSQL_USER=trueasync \
     MYSQL_PASSWORD=trueasync
 
-# Expose HTTP, MySQL and XDEBUG ports
-EXPOSE 8080 3306 9009
+# Expose HTTP, HTTPS, MySQL and XDEBUG ports
+EXPOSE 8080 443 443/udp 3306 9009
 
 # Copy startup script
 COPY start.sh /app/start.sh
@@ -196,7 +218,7 @@ COPY resources /app/www/resources
 COPY bootstrap /app/www/bootstrap
 COPY storage /app/www/storage
 COPY entrypoint.php /app/www/entrypoint.php
-COPY unit-config.json /app/www/unit-config.json
+COPY Caddyfile /app/www/Caddyfile
 COPY .env /app/www/.env
 COPY artisan /app/www/artisan
 COPY composer.json /app/www/composer.json
@@ -213,7 +235,7 @@ WORKDIR /app/www
 RUN composer install --no-dev --optimize-autoloader --ignore-platform-reqs
 
 # Set ownership and permissions for Laravel storage directories
-RUN chown -R unit:unit /app/www \
+RUN chown -R frankenphp:frankenphp /app/www \
     && chmod -R 775 /app/www/storage \
     && chmod -R 775 /app/www/bootstrap/cache
 
@@ -222,7 +244,7 @@ VOLUME ["/var/lib/mysql"]
 
 WORKDIR /app
 
-# Note: Running as root to manage both MySQL and NGINX Unit services
+# Note: Running as root to manage both MySQL and FrankenPHP services
 # MySQL requires specific user permissions which are handled in the startup script
 
 # Start using startup script

@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-echo "=== NGINX Unit with TrueAsync PHP + MySQL 8.0 for Laravel ==="
+echo "=== FrankenPHP with TrueAsync PHP + MySQL 8.0 for Laravel ==="
 echo "PHP Version: $(php -v | head -n1)"
-echo "Unit Version: $(unitd --version 2>&1)"
+echo "FrankenPHP Version: $(frankenphp version 2>&1 | head -n1)"
 echo "MySQL Version: $(mysqld --version)"
 echo ""
 
@@ -59,7 +59,7 @@ else
 fi
 
 # Configuration paths
-CONFIG_FILE="${UNIT_CONFIG_FILE:-/app/www/unit-config.json}"
+CONFIG_FILE="${FRANKENPHP_CONFIG_FILE:-/app/www/Caddyfile}"
 
 echo "Configuration: $CONFIG_FILE"
 echo "Web Root: /app/www"
@@ -72,50 +72,26 @@ if [ ! -f "$CONFIG_FILE" ]; then
 fi
 
 # Ensure storage directories have correct permissions
-chown -R unit:unit /app/www/storage /app/www/bootstrap/cache
+chown -R frankenphp:frankenphp /app/www/storage /app/www/bootstrap/cache
 chmod -R 775 /app/www/storage /app/www/bootstrap/cache
 
-# Start Unit daemon
-echo "Starting NGINX Unit..."
-unitd --no-daemon &
-UNITD_PID=$!
+# Create logs directory if it doesn't exist
+mkdir -p /app/www/storage/logs
+chown -R frankenphp:frankenphp /app/www/storage/logs
 
-# Wait for control socket
-echo "Waiting for control socket..."
-for i in {1..10}; do
-  if [ -S /usr/local/var/run/unit/control.unit.sock ]; then
-    echo "Control socket ready"
-    break
-  fi
-  sleep 1
-done
+# Start FrankenPHP
+echo "Starting FrankenPHP with TrueAsync support..."
+cd /app/www
 
-if [ ! -S /usr/local/var/run/unit/control.unit.sock ]; then
-  echo "ERROR: Control socket not available after 10 seconds"
-  exit 1
-fi
-
-# Load configuration
-echo "Loading configuration from $CONFIG_FILE..."
-RESPONSE=$(curl -X PUT --data-binary @"$CONFIG_FILE" \
-  --unix-socket /usr/local/var/run/unit/control.unit.sock \
-  http://localhost/config 2>&1)
-
-echo "Response: $RESPONSE"
-
-if echo "$RESPONSE" | grep -q "error"; then
-  echo "WARNING: Configuration failed to load!"
-  echo "Please check your unit-config.json file"
-  echo "Unit is still running, you can configure it manually"
-else
-  echo "Configuration loaded successfully"
-fi
+frankenphp run --config "$CONFIG_FILE" &
+FRANKENPHP_PID=$!
 
 echo ""
 echo "========================================"
 echo "Laravel TrueAsync Application is ready!"
 echo "========================================"
-echo "NGINX Unit: http://0.0.0.0:8080"
+echo "FrankenPHP: http://0.0.0.0:8080"
+echo "           https://0.0.0.0:443"
 echo "MySQL: localhost:3306"
 echo "  - Database: ${MYSQL_DATABASE}"
 echo "  - User: ${MYSQL_USER}"
@@ -125,10 +101,11 @@ echo ""
 echo "Logs:"
 echo "  - Async debug: /app/www/storage/logs/async-debug.log"
 echo "  - Laravel: /app/www/storage/logs/laravel.log"
+echo "  - FrankenPHP access: /app/www/storage/logs/frankenphp-access.log"
 echo "  - XDebug: /app/www/storage/logs/xdebug.log"
 echo "========================================"
 echo ""
 
 # Wait for both processes
-wait -n $UNITD_PID $MYSQL_PID
+wait -n $FRANKENPHP_PID $MYSQL_PID
 exit $?

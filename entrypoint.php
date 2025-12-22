@@ -1,8 +1,8 @@
 <?php
 
-use NginxUnit\HttpServer;
-use NginxUnit\Request;
-use NginxUnit\Response;
+use FrankenPHP\HttpServer;
+use FrankenPHP\Request;
+use FrankenPHP\Response;
 
 set_time_limit(0);
 
