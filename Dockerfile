@@ -10,7 +10,7 @@ ARG PHP_BRANCH=true-async
 ARG TRUEASYNC_BRANCH=main
 ARG FRANKENPHP_BRANCH=true-async
 ARG XDEBUG_BRANCH=true-async-86
-ARG GO_VERSION=1.23.4
+ARG GO_VERSION=1.25.4
 
 # ---------- 1. System toolchain & libraries ----------
 RUN apt-get update && apt-get install -y \
@@ -136,13 +136,11 @@ RUN curl -s https://api.github.com/repos/e-dant/watcher/releases/latest | \
 # ---------- 11. Build FrankenPHP ----------
 WORKDIR /usr/src/frankenphp
 
-# Set up CGO flags for PHP embedding
-ENV CGO_CFLAGS="$(php-config --includes)"
-ENV CGO_LDFLAGS="$(php-config --ldflags) $(php-config --libs)"
-
 # Build FrankenPHP with TrueAsync support
 RUN cd caddy/frankenphp && \
-    go build -tags "trueasync,nowatcher" -o frankenphp && \
+    export CGO_CFLAGS="$(php-config --includes)" && \
+    export CGO_LDFLAGS="$(php-config --ldflags) $(php-config --libs)" && \
+    go build -tags "trueasync" -o frankenphp && \
     cp frankenphp /usr/local/bin/frankenphp && \
     chmod +x /usr/local/bin/frankenphp
 
@@ -160,7 +158,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libffi8 libgdbm6 liblmdb0 libsnmp40 \
     libtidy5deb1 libxslt1.1 libicu74 libpsl5 \
     libpcre2-8-0 libstdc++6 \
-    ca-certificates curl \
+    ca-certificates curl git \
     mysql-server-8.0 \
     && rm -rf /var/lib/apt/lists/*
 

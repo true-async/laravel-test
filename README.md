@@ -120,11 +120,22 @@ Each request is processed in a separate coroutine, enabling true async/await pat
 
 You can mount your own Caddyfile:
 
+**Linux/macOS:**
 ```bash
 docker run -d \
   -v ./custom-Caddyfile:/app/www/Caddyfile \
   -p 8080:8080 \
   laravel-frankenphp:latest
+```
+
+**Windows PowerShell:**
+```powershell
+docker run -d -v ${PWD}/Caddyfile:/app/www/Caddyfile -p 8080:8080 laravel-frankenphp:latest
+```
+
+**Windows CMD:**
+```cmd
+docker run -d -v %cd%/Caddyfile:/app/www/Caddyfile -p 8080:8080 laravel-frankenphp:latest
 ```
 
 ### Debugging

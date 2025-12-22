@@ -1,0 +1,33 @@
+{
+	frankenphp {
+		num_threads 2
+		worker {
+			file /app/www/entrypoint.php
+			num 1
+			async
+			buffer_size 20
+			match *
+		}
+	}
+}
+
+:8080 {
+	root * /app/www/public
+
+	# Enable PHP server with FrankenPHP
+	route {
+		# Rewrite all requests to entrypoint.php
+		rewrite * /entrypoint.php?uri={http.request.uri.path}
+
+		php_server {
+			index off
+			file_server off
+		}
+	}
+
+	# Logging
+	log {
+		output file /app/www/storage/logs/frankenphp-access.log
+		level INFO
+	}
+}
