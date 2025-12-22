@@ -114,14 +114,6 @@ The `entrypoint.php` file uses FrankenPHP's TrueAsync API:
 
 Each request is processed in a separate coroutine, enabling true async/await patterns in Laravel.
 
-## Differences from NGINX Unit version
-
-- **FrankenPHP** instead of NGINX Unit for better Go/PHP integration
-- **Built-in HTTPS** support via Caddy
-- **HTTP/3** support out of the box
-- **Better performance** with worker mode and TrueAsync
-- **Simplified configuration** via Caddyfile instead of JSON
-
 ## Development
 
 ### Custom Caddyfile
