@@ -186,7 +186,6 @@ RUN ldconfig
 
 # Set PATH
 ENV PATH="/usr/local/bin:/usr/local/sbin:$PATH"
-ENV GODEBUG=cgocheck=0
 
 # Verify installations
 RUN php -v && frankenphp version
