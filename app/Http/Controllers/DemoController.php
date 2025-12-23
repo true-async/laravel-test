@@ -17,7 +17,7 @@ class DemoController extends Controller
 
         // Performance stats
         $stats = [
-            'coroutines' => count(\Async\getCoroutines()),
+            'coroutines' => count(\Async\get_coroutines()),
             'memory_usage' => memory_get_usage(true),
             'memory_peak' => memory_get_peak_usage(true),
             'memory_usage_mb' => round(memory_get_usage(true) / 1024 / 1024, 2),

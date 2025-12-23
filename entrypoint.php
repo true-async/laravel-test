@@ -142,12 +142,12 @@ HttpServer::onRequest(function (Request $request, Response $response) use ($app,
 
     try {
         // Get current coroutine ID for logging
-        $coroutine = \Async\currentCoroutine();
+        $coroutine = \Async\current_coroutine();
         $coroutineId = $coroutine ? $coroutine->getId() : 0;
 
         log_debug("Processing request in coroutine", [
             'coroutine_id' => $coroutineId,
-            'total_coroutines' => count(\Async\getCoroutines())
+            'total_coroutines' => count(\Async\get_coroutines())
         ]);
 
         // Create Laravel Request from globals

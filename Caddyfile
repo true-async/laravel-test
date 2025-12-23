@@ -12,7 +12,7 @@
 }
 
 :8080 {
-	root * /app/www/public
+	root * /app/www
 
 	# Enable PHP server with FrankenPHP
 	route {

@@ -21,7 +21,7 @@ class CoroutineAwareDatabaseManager extends DatabaseManager
         }
 
         // Get current coroutine ID
-        $coroutine = \Async\currentCoroutine();
+        $coroutine = \Async\current_coroutine();
         $coroutineId = $coroutine ? $coroutine->getId() : 0;
 
         // Create unique connection name for this coroutine
