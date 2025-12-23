@@ -440,7 +440,7 @@
         <div class="intro">
             <h2>Hello World!</h2>
             <p>
-                This demo showcases Laravel running on <strong>TrueAsync PHP</strong> with <strong>nginx-unit</strong>.
+                This demo showcases Laravel running on <strong>TrueAsync PHP</strong> with <strong>FrankenPHP</strong>.
                 Each HTTP request is handled in its own coroutine, enabling true concurrency without blocking operations.
             </p>
             <div class="stats">
@@ -489,14 +489,13 @@
     <footer>
         <div class="footer-content">
             <p><strong>Powered by TrueAsync PHP</strong></p>
-            <p>Laravel Framework • nginx-unit • Coroutine-based execution</p>
+            <p>Laravel Framework • FrankenPHP • Coroutine-based execution</p>
             <p style="margin-top: 10px; font-size: 0.85em; color: #999;">
                 Each request creates a fresh application instance and database connection for complete isolation
             </p>
             <div class="footer-links">
                 <a href="https://laravel.com" target="_blank">Laravel Documentation</a>
                 <a href="https://github.com/true-async" target="_blank">TrueAsync GitHub</a>
-                <a href="https://unit.nginx.org" target="_blank">nginx-unit</a>
             </div>
         </div>
     </footer>
