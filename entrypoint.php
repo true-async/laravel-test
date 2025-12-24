@@ -150,6 +150,17 @@ HttpServer::onRequest(function (Request $request, Response $response) use ($app,
             'total_coroutines' => count(\Async\get_coroutines())
         ]);
 
+        $parsedUrl = parse_url($uri);
+        $queryString = $parsedUrl['query'] ?? '';
+        $queryParams = [];
+        if ($queryString !== '') {
+            parse_str($queryString, $queryParams);
+        }
+
+        $_GET = $queryParams;
+        $_REQUEST = array_merge($queryParams, $_POST ?? []);
+        $_SERVER['QUERY_STRING'] = $queryString;
+
         // Create Laravel Request from globals
         $laravelRequest = Illuminate\Http\Request::capture();
 
@@ -221,6 +232,11 @@ HttpServer::onRequest(function (Request $request, Response $response) use ($app,
 
         $response->end();
         return;
+    } finally {
+        // Always reset globals to avoid leaking state across coroutines
+        $_GET = [];
+        $_REQUEST = [];
+        unset($_SERVER['QUERY_STRING']);
     }
 
     // Clean output buffer
